@@ -1,5 +1,6 @@
 param(
-    [string]$SubscriptionId = "327a0648-13c5-43ae-833b-737dddad553a",
+    [Parameter(Mandatory = $true)]
+    [string]$SubscriptionId,
     [string]$Location = "eastus2",
     [string]$ResourceGroupName = "rg-eshop-sql-poc",
     [string]$ClientIPv4
@@ -12,13 +13,6 @@ $templatePath = Join-Path $repositoryRoot "infra\main.bicep"
 $deploymentParameterFile = $null
 $sqlPassword = $null
 $adminPassword = $null
-
-function Invoke-Az([string[]]$Arguments) {
-    & az @Arguments
-    if ($LASTEXITCODE -ne 0) {
-        throw "Azure CLI command failed: az $($Arguments[0])"
-    }
-}
 
 function Get-AzValue([string[]]$Arguments) {
     $value = & az @Arguments
@@ -37,12 +31,12 @@ try {
     }
     $clientCidr = "$ClientIPv4/32"
 
-    $currentSubscription = Get-AzValue @("account", "show", "--query", "id", "--output", "tsv")
+    $currentSubscription = Get-AzValue @("account", "show", "--subscription", $SubscriptionId, "--query", "id", "--output", "tsv")
     if ($currentSubscription -ne $SubscriptionId) {
-        Invoke-Az @("account", "set", "--subscription", $SubscriptionId)
+        throw "The requested Azure subscription could not be verified. Supply its subscription ID."
     }
 
-    $groupExists = Get-AzValue @("group", "exists", "--name", $ResourceGroupName)
+    $groupExists = Get-AzValue @("group", "exists", "--name", $ResourceGroupName, "--subscription", $SubscriptionId)
     if ($groupExists -eq "true") {
         throw "Resource group '$ResourceGroupName' already exists. Review it and choose a new name before provisioning."
     }

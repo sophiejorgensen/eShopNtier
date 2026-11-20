@@ -1,7 +1,8 @@
 param(
     [Parameter(Mandatory = $true)]
     [string]$VmName,
-    [string]$SubscriptionId = "327a0648-13c5-43ae-833b-737dddad553a",
+    [Parameter(Mandatory = $true)]
+    [string]$SubscriptionId,
     [string]$ResourceGroupName = "rg-eshop-sql-poc",
     [string]$Location = "eastus2",
     [Parameter(Mandatory = $true)]

@@ -1,31 +1,47 @@
 # Azure SQL Server POC
 
-These scripts deploy a small SQL Server 2022 Developer VM in Azure and run the
-eShop application locally against it. The application is not deployed to Azure.
-The VM is a development/test source instance for the user's later Modernize CLI
-assessment, not a production database.
+These scripts create a SQL Server 2022 Developer VM in Azure, initialize a new
+eShop database, and run the application on your Windows computer against it.
+They do not deploy the application to Azure, migrate an existing database, or
+set up the separate Modernize SQL assessment login. This is a development/test
+POC, not a production deployment.
 
 ## Prerequisites
 
-- Windows PowerShell and the .NET Framework 4.7.2 targeting/build tools required
-  by `eShopDecomposed.sln`
-- Azure CLI, Bicep, and an authenticated Azure account with permission to deploy
-  resource groups, networking, and virtual machines in the approved subscription
-- A public IPv4 address for the workstation running the application
+- Windows, Git, PowerShell, a .NET SDK, and the .NET Framework 4.7.2 developer
+  pack (targeting pack). The build restores NuGet packages from configured feeds.
+- Azure CLI with Bicep installed (`az bicep install`), and an Azure subscription
+  where you can create resource groups, networking, VMs, deployments, and VM
+  Run Commands. SQL Server 2022 Developer and the selected VM size must be
+  available in the chosen region; quota and subscription policy must permit them.
+- Internet access and a public IPv4 address for this computer. Ports 5000-5003
+  must be free locally, and your network must allow outbound SQL TCP port 1433.
+- An Azure budget for the VM, disks, and networking. Developer edition is
+  licensed for development/testing only.
 
 ## Deploy and run
 
-From the repository root, run:
+Clone the repository and switch to the branch containing these scripts. In
+PowerShell at the repository root, sign in and choose **your own** subscription:
 
 ```powershell
-.\scripts\deploy-azure-sqlserver.ps1
+git clone https://github.com/sophiejorgensen/eShopNtier.git
+Set-Location eShopNtier
+git switch sojorgensen/sqlserver
+az login
+az account list --output table
+az bicep install
+.\scripts\deploy-azure-sqlserver.ps1 -SubscriptionId "<your-subscription-id>"
 ```
 
-The script defaults to subscription `327a0648-13c5-43ae-833b-737dddad553a`,
-region `eastus2`, resource group `rg-eshop-sql-poc`, and VM size
-`Standard_D2as_v7`. It discovers the workstation's public IPv4 using `api.ipify.org`;
-pass `-ClientIPv4 <address>` to specify it explicitly. The script refuses to
-reuse an existing resource group.
+Replace the placeholder with your subscription ID. The script targets that
+subscription explicitly and does not change the Azure CLI's active subscription.
+It defaults to region `eastus2`, resource group `rg-eshop-sql-poc`, and VM size
+`Standard_D2as_v7`. Use `-Location <region>` or
+`-ResourceGroupName <new-name>` to change the first two. The script refuses to
+reuse an existing resource group. It discovers your public IPv4 using
+`api.ipify.org`; pass `-ClientIPv4 <address>` to specify it explicitly instead.
+Review the expected cost before running: this creates billable Azure resources.
 
 The script deploys the subscription-scoped Bicep template in `infra\`, enables
 SQL TCP/IP and mixed-mode authentication through Azure VM Run Command, and
@@ -42,14 +58,24 @@ After deployment, the local app is available at:
 - Stock health: <http://localhost:5003/health>
 
 Run `.\scripts\start-local.ps1` later to start the app again. It requires the
-deployment's local connection files. App logs are written to `logs\`.
+deployment's local connection files and must be run as the same Windows user on
+the same computer. Start the Azure VM first if it was deallocated. App logs are
+written to `logs\`. The app uses sample data initialized on first deployment;
+no database backup or data from another deployment is copied.
+
+If provisioning fails, resources already created may continue to incur charges.
+Inspect the Azure resource group, VM Run Command results, and app logs before
+retrying. The deployment script deliberately refuses to overwrite an existing
+resource group or local connection files; don't delete either until you have
+reviewed whether you need their contents.
 
 ## Network and credentials
 
 Inbound TCP 1433 is allowed only from the selected workstation IPv4 `/32` in
 both the Azure network security group and Windows Firewall. If the workstation's
-public IP changes, update the network rule and rerun the SQL configuration with
-the new address before reconnecting.
+public IP changes, both rules need updating before reconnecting. The app
+connection files are specific to the machine and Windows user that deployed it;
+another user should deploy their own POC rather than copy credentials.
 
 The SQL login password and VM administrator password are stored as DPAPI-protected
 XML files under `.local\`, bound to the Windows user who ran the deployment.
@@ -66,22 +92,22 @@ validating its identity. Use a properly trusted certificate for production.
 
 The approved estimate for `Standard_D2as_v7` Windows compute is about $133.59 per
 730-hour month. Managed disks, the public IP, outbound data, taxes, and
-subscription-specific discounts and any security-service charges are additional. SQL Server Developer is free
-for development/testing only. Compute charges continue while the VM is running;
+subscription-specific discounts and any security-service charges are additional.
+Pricing and VM availability vary by region and subscription. Compute charges continue while the VM is running;
 deallocating it stops VM compute charges but does not remove disk or public-IP
 charges.
 
 To deallocate the VM while retaining its data:
 
 ```powershell
-az vm deallocate --resource-group rg-eshop-sql-poc --name <vm-name>
+az vm deallocate --subscription <your-subscription-id> --resource-group <resource-group> --name <vm-name>
 ```
 
 To permanently remove the POC and its data, review the resource group first,
 then delete it:
 
 ```powershell
-az group delete --name rg-eshop-sql-poc --yes --no-wait
+az group delete --subscription <your-subscription-id> --name <resource-group> --yes --no-wait
 ```
 
 Deleting the resource group permanently deletes the VM, database files, network,
