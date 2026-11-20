@@ -2,13 +2,14 @@ using System;
 using System.Collections.Generic;
 using System.Data.Entity;
 using System.Linq;
+using eShop.Contracts.Data;
 using eShop.Contracts.Models;
 
 namespace Stock.Worker.Data
 {
     public class StockDbContext : DbContext
     {
-        public StockDbContext() : base("name=StockDb") { }
+        public StockDbContext() : base(SqlServerConnectionString.FromConfiguration("StockDb")) { }
 
         public DbSet<CatalogItemStock> CatalogItemStocks { get; set; }
 

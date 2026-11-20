@@ -1,11 +1,12 @@
 using System.Data.Entity;
+using eShop.Contracts.Data;
 using eShop.Contracts.Models;
 
 namespace Catalog.Service.Data
 {
     public class CatalogDbContext : DbContext
     {
-        public CatalogDbContext() : base("name=CatalogDb")
+        public CatalogDbContext() : base(SqlServerConnectionString.FromConfiguration("CatalogDb"))
         {
             Database.SetInitializer(new CatalogDbInitializer());
         }
